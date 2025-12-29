@@ -44,7 +44,7 @@ private:
     int _currentQuarter;
     
     // 1v1 Settings
-    const float QUARTER_TIME = 600.0f; // 10 minutes (effectively single period)
+    const float QUARTER_TIME = 120.0f; // 2 minutes total
     const int MAX_QUARTERS = 1;        // Single period for 1v1
     const int WIN_SCORE = 21;          // Standard 1v1 score limit
 };

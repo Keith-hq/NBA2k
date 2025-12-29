@@ -18,7 +18,12 @@ public:
     
     // Core Logic
     void update(float dt) override;
+    void reset();
     
+    // Jump
+    void jump();
+    bool canJump() const;
+
     // Controller
     void setController(PlayerController* controller);
     PlayerController* getController() const { return _controller; }
@@ -42,6 +47,8 @@ public:
     DribbleSystem* getDribbleSystem() const { return _dribbleSystem; }
     DefenseSystem* getDefenseSystem() const { return _defenseSystem; }
     cocos2d::DrawNode* getTrajectoryNode() const { return _trajectoryNode; }
+    cocos2d::DrawNode* getStaminaNode() const { return _staminaNode; }
+    float getStamina() const { return _stamina; }
     
     // Physics
     RigidBody* getBody() const { return _body; }
@@ -53,6 +60,7 @@ public:
         IDLE,
         DRIBBLING,
         SHOOTING,
+        RECOVERY,
         DEFENSING,
         CELEBRATING
     };
@@ -87,6 +95,7 @@ private:
     // Visuals
     cocos2d::Node* _visualNode;
     cocos2d::Sprite3D* _model;
+    cocos2d::DrawNode* _staminaNode;
     
     // State
     State _state;
@@ -100,14 +109,17 @@ private:
     // Gameplay
     float _shootChargeTime;
     bool _isChargingShot;
+    float _recoveryTimer;
     float _celebrationTimer;
     float _pickupCooldown;
     bool _mustClearBall;
+    float _stamina;
     
     // Helpers
     void handleMovement(float dt);
     void handleActions(float dt);
     void updateVisuals();
+    void updateStaminaBar();
     void attemptShoot();
     void updateBallPosition();
     float calculateHitChance(float distance);

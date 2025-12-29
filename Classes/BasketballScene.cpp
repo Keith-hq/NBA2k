@@ -61,7 +61,11 @@ bool BasketballScene::init() {
     GameFeedback::getInstance()->init(this);
     
     // Audio
-    AudioManager::getInstance()->playBackgroundMusic(SoundBank::BGM_GAME, true);
+    AudioManager::getInstance()->setBackgroundMusicVolume(3.0f); 
+    std::string musicPath = FileUtils::getInstance()->fullPathForFilename(SoundBank::BGM_GAME);
+    if (!musicPath.empty()) {
+        AudioManager::getInstance()->playBackgroundMusic(musicPath, true);
+    }
     
     scheduleUpdate();
     
@@ -206,6 +210,9 @@ void BasketballScene::createPlayer() {
     addChild(_player);
     if (_player->getTrajectoryNode()) {
         addChild(_player->getTrajectoryNode(), 100); // Overlay
+    }
+    if (_player->getStaminaNode()) {
+        addChild(_player->getStaminaNode(), 110); // Overlay above trajectory
     }
     
     _playerController = new HumanController();

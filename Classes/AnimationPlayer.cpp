@@ -80,8 +80,11 @@ void AnimationPlayer::update(float dt) {
 }
 
 void AnimationPlayer::playState(AnimState state) {
-    // Force replay for SHOOT to ensure it restarts
-    if (_currentState == state && state != AnimState::SHOOT && state != AnimState::CELEBRATE) return;
+    // Force replay for SHOOT to ensure it restarts?
+    // No, if we call this every frame in updateVisuals, we shouldn't restart it.
+    // Only restart if transitioning FROM another state, which is handled by _currentState == state check.
+    
+    if (_currentState == state && state != AnimState::CELEBRATE) return;
     
     _currentState = state;
     _stateTime = 0.0f;

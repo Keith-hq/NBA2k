@@ -70,77 +70,6 @@ void HUD::setupUI() {
     _feedbackText->enableOutline(Color4B::BLACK, 2);
     _feedbackText->setVisible(false);
     addChild(_feedbackText);
-
-    // Shot Meter (Bottom Center)
-    _shotMeterPanel = Layout::create();
-    _shotMeterPanel->setContentSize(Size(300, 40));
-    _shotMeterPanel->setAnchorPoint(Vec2(0.5f, 0.0f));
-    _shotMeterPanel->setPosition(Vec2(origin.x + visibleSize.width * 0.5f, origin.y + 100));
-    addChild(_shotMeterPanel);
-    
-    // Background
-    auto meterBg = Layout::create();
-    meterBg->setContentSize(Size(300, 20));
-    meterBg->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-    meterBg->setBackGroundColor(Color3B::GRAY);
-    meterBg->setPosition(Vec2(0, 10));
-    _shotMeterPanel->addChild(meterBg);
-
-    // Bar
-    _shotBar = LoadingBar::create("sliderProgress.png"); // Using default or solid color
-    // Since we might not have assets, let's use a LayerColor masked or scaled
-    // But LoadingBar is standard. If image missing, it won't show.
-    // Let's try to create a simple texture or use LayerColor for bar.
-    // Actually, let's use a scaled Sprite for the bar content if LoadingBar fails, 
-    // but for now let's assume we can use a simple white pixel stretched.
-    
-    // Fallback: Use Layout as bar
-    // But LoadingBar is nicer.
-    // Let's stick to simple primitives if assets unknown.
-    // "sliderProgress.png" is standard in Cocos tests but maybe not here.
-    // We'll create a white sprite manually.
-    
-    auto whiteTexture = new Texture2D();
-    const unsigned char pixels[] = {255, 255, 255, 255};
-    Image* image = new Image();
-    image->initWithRawData(pixels, 4, 1, 1, 32); // 1x1 white pixel
-    whiteTexture->initWithImage(image);
-    image->release();
-    
-    // Create sprite from texture
-    auto barSprite = Sprite::createWithTexture(whiteTexture);
-    barSprite->setTextureRect(Rect(0,0,300,20));
-    barSprite->setColor(Color3B::YELLOW);
-    
-    // We can't put Sprite into LoadingBar directly easily without file.
-    // So let's just use a ProgressBar implemented with scaling LayerColor or Sprite.
-    
-    _shotBar = LoadingBar::create();
-    _shotBar->setScale9Enabled(true);
-    _shotBar->setContentSize(Size(300, 20));
-    _shotBar->setDirection(LoadingBar::Direction::LEFT);
-    _shotBar->setPercent(0);
-    _shotBar->setPosition(Vec2(150, 20));
-    // LoadingBar needs a texture to show anything.
-    // If we don't have one, it's invisible.
-    
-    // Alternative: Use a Layout for the bar and change its width.
-    auto barLayout = Layout::create();
-    barLayout->setBackGroundColorType(Layout::BackGroundColorType::SOLID);
-    barLayout->setBackGroundColor(Color3B::YELLOW);
-    barLayout->setContentSize(Size(0, 20));
-    barLayout->setPosition(Vec2(0, 10));
-    barLayout->setName("BarLayout");
-    _shotMeterPanel->addChild(barLayout);
-
-    // Marker for optimal release
-    _optimalMarker = Sprite::create();
-    _optimalMarker->setTextureRect(Rect(0,0,4,26));
-    _optimalMarker->setColor(Color3B::WHITE);
-    _optimalMarker->setPosition(Vec2(200, 20)); // Default pos
-    _shotMeterPanel->addChild(_optimalMarker);
-
-    _shotMeterPanel->setVisible(false);
 }
 
 void HUD::updateScore(int playerScore, int aiScore) {
@@ -165,51 +94,7 @@ void HUD::updateShotClock(float shotClock) {
     }
 }
 
-void HUD::updateShotMeter(float currentCharge, float optimalCharge) {
-    if (!_shotMeterPanel->isVisible()) return;
-
-    auto bar = _shotMeterPanel->getChildByName<Layout*>("BarLayout");
-    if (bar) {
-        // User Request: 0-2s range, 1.0s optimal.
-        // We assume optimalCharge is passed as 1.0f.
-        // We set max range to 2.0f.
-        
-        float maxRange = 2.0f; 
-        if (optimalCharge > 0.1f) {
-             // If optimal varies, maybe scale? But request was fixed 1.0s.
-             // We'll stick to 2.0f fixed range for consistency.
-        }
-        
-        float pct = currentCharge / maxRange;
-        if (pct > 1.0f) pct = 1.0f;
-        
-        float width = 300.0f * pct;
-        bar->setContentSize(Size(width, 20));
-        
-        // Color
-        float diff = std::abs(currentCharge - optimalCharge);
-        // Green window < 0.1s
-        if (diff < 0.1f) bar->setBackGroundColor(Color3B::GREEN);
-        else if (diff < 0.25f) bar->setBackGroundColor(Color3B::YELLOW);
-        else bar->setBackGroundColor(Color3B::ORANGE);
-    }
-    
-    // Position marker
-    if (_optimalMarker) {
-        // Marker should be at optimalCharge position
-        float maxRange = 2.0f;
-        float optPct = optimalCharge / maxRange;
-        if (optPct > 1.0f) optPct = 1.0f;
-        
-        float markerX = 300.0f * optPct;
-        _optimalMarker->setPosition(Vec2(markerX, 10));
-    }
-}
-
-
-void HUD::showShotMeter(bool visible) {
-    _shotMeterPanel->setVisible(visible);
-}
+ 
 
 void HUD::showFeedback(const std::string& text) {
     if (_feedbackText) {

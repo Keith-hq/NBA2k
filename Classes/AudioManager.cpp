@@ -36,7 +36,11 @@ AudioManager::~AudioManager() {
 }
 
 void AudioManager::init() {
-    // Preload effects if needed
+    // Preload music to ensure it's ready
+    std::string fullPath = FileUtils::getInstance()->fullPathForFilename("music.ogg");
+    if (!fullPath.empty()) {
+        SimpleAudioEngine::getInstance()->preloadBackgroundMusic(fullPath.c_str());
+    }
 }
 
 void AudioManager::playBackgroundMusic(const std::string& filename, bool loop) {

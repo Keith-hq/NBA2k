@@ -6,6 +6,8 @@
 #include "ShootingSystem.h"
 #include "DribbleSystem.h"
 #include "DefenseSystem.h"
+#include "2d/CCCamera.h"
+#include "2d/CCScene.h"
 
 USING_NS_CC;
 
@@ -28,6 +30,7 @@ Player::~Player() {
     CC_SAFE_RELEASE(_dribbleSystem);
     CC_SAFE_RELEASE(_defenseSystem);
     CC_SAFE_RELEASE(_trajectoryNode);
+    CC_SAFE_RELEASE(_staminaNode);
     if (_body) delete _body;
 }
 
@@ -48,6 +51,7 @@ bool Player::init() {
     _isChargingShot = false;
     _pickupCooldown = 0.0f;
     _mustClearBall = false;
+    _stamina = 1.0f;
     
     // Visuals
     setCascadeColorEnabled(true);
@@ -58,6 +62,13 @@ bool Player::init() {
     _trajectoryNode = DrawNode::create();
     if (_trajectoryNode) {
         _trajectoryNode->retain(); // Keep it alive, will be added to Scene later
+    }
+    
+    _staminaNode = DrawNode::create();
+    if (_staminaNode) {
+        _staminaNode->retain();
+        _staminaNode->setIsolated(true);
+        _staminaNode->setCameraMask((unsigned short)CameraFlag::DEFAULT);
     }
     
     // Load Model
@@ -120,6 +131,43 @@ bool Player::init() {
     return true;
 }
 
+void Player::reset() {
+    CCLOG("Player::reset() called");
+    _state = State::IDLE;
+    _hasBall = false;
+    _shootChargeTime = 0.0f;
+    _isChargingShot = false;
+    _pickupCooldown = 0.0f;
+    _mustClearBall = false;
+    _stamina = 1.0f;
+    _recoveryTimer = 0.0f;
+    _celebrationTimer = 0.0f;
+    
+    // Reset Systems
+    if (_shootingSystem) {
+        // _shootingSystem->reset(); // Implement if needed
+    }
+    if (_dribbleSystem) {
+        _dribbleSystem->stopDribble();
+    }
+    if (_defenseSystem) {
+        _defenseSystem->exitStance();
+    }
+    
+    // Reset Visuals
+    if (_animPlayer) {
+        _animPlayer->playState(AnimationPlayer::AnimState::IDLE);
+    }
+    
+    // Reset Physics Velocity
+    if (_body) {
+        _body->setVelocity(Vec3::ZERO);
+    }
+    
+    if (_trajectoryNode) _trajectoryNode->clear();
+    if (_staminaNode) _staminaNode->clear();
+}
+
 void Player::setStats(float speed, float shooting, float defense) {
     _speedStat = speed;
     _shootingStat = shooting;
@@ -156,6 +204,31 @@ void Player::setPosition3D(const Vec3& pos) {
 Vec3 Player::getPosition3D() const {
     if (_body) return _body->getPosition();
     return Node::getPosition3D();
+}
+
+bool Player::canJump() const {
+    // Cannot jump if busy
+    if (_state == State::SHOOTING || _state == State::CELEBRATING) return false;
+    if (_defenseSystem && _defenseSystem->isStunned()) return false;
+    
+    // Ground check (allow small tolerance)
+    float y = _body ? _body->getPosition().y : getPosition3D().y;
+    return y <= 0.1f;
+}
+
+void Player::jump() {
+    if (!canJump()) return;
+    
+    if (_body) {
+        Vec3 vel = _body->getVelocity();
+        vel.y = SimplePhysics::PLAYER_JUMP_SPEED;
+        _body->setVelocity(vel);
+        
+        // Play animation
+        if (_animPlayer) {
+            _animPlayer->playJump();
+        }
+    }
 }
 
 void Player::update(float dt) {
@@ -215,17 +288,28 @@ void Player::handleMovement(float dt) {
     }
 
     if (!_controller) return;
-    
-    // Check Stun (Ankle Breaker)
-    if (_defenseSystem && _defenseSystem->isStunned()) {
-        if (_body) {
-            Vec3 vel = _body->getVelocity();
-            vel.x = 0;
-            vel.z = 0;
-            _body->setVelocity(vel);
+
+    // Check if grounded for input control (User Request: Silence input in air)
+    float currentY = _body ? _body->getPosition().y : getPosition3D().y;
+    bool isGrounded = (currentY <= 0.15f);
+
+    if (!isGrounded) {
+        // In air: No input response
+        
+        // Fix state if needed
+        if (_state == State::DRIBBLING) {
+            _state = State::IDLE;
         }
+        
+        // Continue stamina regen
+        _stamina += 0.25f * dt;
+        if (_stamina > 1.0f) _stamina = 1.0f;
+        
         return;
     }
+    
+    // Check Stun (Ankle Breaker)
+    bool isStunned = (_defenseSystem && _defenseSystem->isStunned());
 
     // User Request: Stop moving/dribbling when shooting
     if (_state == State::SHOOTING) {
@@ -241,11 +325,48 @@ void Player::handleMovement(float dt) {
         }
         return;
     }
+
+    if (_state == State::RECOVERY) {
+        _recoveryTimer -= dt;
+        if (_recoveryTimer <= 0) {
+            _state = State::IDLE;
+        } else {
+             // Stop movement
+             if (_body) {
+                 Vec3 vel = _body->getVelocity();
+                 vel.x = 0;
+                 vel.z = 0;
+                 _body->setVelocity(vel);
+             }
+             return;
+        }
+    }
     
     Vec2 input = _controller->getMoveInput();
     bool isSprint = _controller->isSprintPressed();
+    if (isStunned) {
+        isSprint = false;
+    }
+
+    if (_controller->isJumpPressed()) {
+        jump();
+    }
+    
+    if (isSprint && input.length() > 0.1f && _stamina > 0.0f) {
+        _stamina -= 0.5f * dt;
+    } else {
+        _stamina += 0.25f * dt;
+    }
+    if (_stamina < 0.0f) _stamina = 0.0f;
+    if (_stamina > 1.0f) _stamina = 1.0f;
+    if (_stamina <= 0.0f) {
+        isSprint = false;
+    }
     
     float speed = SimplePhysics::PLAYER_SPEED * (_speedStat / 50.0f);
+    if (isStunned) {
+        speed *= 0.4f;
+    }
     if (isSprint) speed *= 1.5f;
     
     if (input.length() > 0.1f) {
@@ -358,6 +479,10 @@ void Player::handleMovement(float dt) {
 
 void Player::handleActions(float dt) {
     if (!_controller) return;
+
+    // Check if grounded (User Request: Silence input in air)
+    float currentY = _body ? _body->getPosition().y : getPosition3D().y;
+    if (currentY > 0.15f) return;
     
     // Shoot
     if (_hasBall && _controller->isShootPressed()) {
@@ -369,7 +494,10 @@ void Player::handleActions(float dt) {
     } else if (_state == State::SHOOTING && !_controller->isShootPressed()) {
         // Release shot
         if (_shootingSystem) _shootingSystem->releaseShot();
-        _state = State::IDLE;
+        
+        // Enter Recovery State (Follow Through)
+        _state = State::RECOVERY;
+        _recoveryTimer = 0.5f; // 0.5s recovery time
     }
     
     // Steal
@@ -424,6 +552,8 @@ void Player::updateVisuals() {
         } else if (_state == State::SHOOTING) {
             _animPlayer->playState(AnimationPlayer::AnimState::SHOOT);
             if (_shootingSystem) _shootingSystem->drawTrajectory(_trajectoryNode);
+        } else if (_state == State::RECOVERY) {
+             _animPlayer->playState(AnimationPlayer::AnimState::SHOOT);
         } else if (_state == State::DEFENSING) {
             _animPlayer->playState(AnimationPlayer::AnimState::DEFEND);
         } else {
@@ -447,6 +577,8 @@ void Player::updateVisuals() {
             }
         }
     }
+    
+    updateStaminaBar();
 }
 
 void Player::updateBallPosition() {
@@ -522,4 +654,40 @@ void Player::updateBallPosition() {
             }
         }
     }
+}
+
+void Player::updateStaminaBar() {
+    if (!_staminaNode) return;
+    Scene* scene = Director::getInstance()->getRunningScene();
+    if (!scene) return;
+    Camera* cam = nullptr;
+    // Prefer the same camera flag as player (USER1). Fallback to default.
+    const auto& cams = scene->getCameras();
+    for (auto* c : cams) {
+        if (c->getCameraFlag() == CameraFlag::USER1) { cam = c; break; }
+    }
+    if (!cam) cam = scene->getDefaultCamera();
+    if (!cam) return;
+    
+    Vec3 headWorld = getPosition3D() + Vec3(0, HEIGHT + 0.3f, 0);
+    Vec2 screenPos = cam->projectGL(headWorld);
+    
+    _staminaNode->clear();
+    
+    float barWidth = 80.0f;
+    float barHeight = 10.0f;
+    float yOffset = 40.0f;
+    
+    Vec2 origin(screenPos.x - barWidth * 0.5f, screenPos.y + yOffset);
+    Vec2 dest(origin.x + barWidth, origin.y + barHeight);
+    
+    _staminaNode->drawSolidRect(origin, dest, Color4F(0.2f, 0.2f, 0.2f, 0.6f));
+    
+    float pct = _stamina;
+    if (pct < 0.0f) pct = 0.0f;
+    if (pct > 1.0f) pct = 1.0f;
+    Vec2 fillDest(origin.x + barWidth * pct, origin.y + barHeight);
+    _staminaNode->drawSolidRect(origin, fillDest, Color4F(0.2f, 0.8f, 0.2f, 0.9f));
+    
+    _staminaNode->drawRect(origin, dest, Color4F(0, 0, 0, 1.0f));
 }

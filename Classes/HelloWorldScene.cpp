@@ -132,6 +132,22 @@ bool HelloWorld::init()
     rankMenu->setPosition(Vec2::ZERO);
     this->addChild(rankMenu, 1);
 
+    // Play Background Music
+    auto audio = CocosDenshion::SimpleAudioEngine::getInstance();
+    audio->stopBackgroundMusic(true);
+    
+    // Use FileUtils to get full path
+    std::string fullPath = FileUtils::getInstance()->fullPathForFilename("music.ogg");
+    if (fullPath.empty()) {
+        CCLOG("Error: music.ogg not found!");
+    } else {
+        CCLOG("Playing music: %s", fullPath.c_str());
+        audio->preloadBackgroundMusic(fullPath.c_str());
+        audio->setBackgroundMusicVolume(1.0f);
+        audio->rewindBackgroundMusic();
+        audio->playBackgroundMusic(fullPath.c_str(), true);
+    }
+
     return true;
 }
 

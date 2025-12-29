@@ -44,11 +44,16 @@ Vec2 HumanController::getMoveInput() {
 }
 
 bool HumanController::isSprintPressed() {
-    return _input->isKeyPressed(GameKey::SPRINT);
+    bool pressed = _input->isKeyPressed(GameKey::SPRINT);
+    auto p = getTarget();
+    if (p && pressed) {
+        if (p->getStamina() <= 0.0f) return false;
+    }
+    return pressed;
 }
 
 bool HumanController::isJumpPressed() {
-    return _input->isKeyDown(GameKey::JUMP);
+    return _input->isKeyPressed(GameKey::JUMP);
 }
 
 bool HumanController::isShootPressed() {

@@ -11,8 +11,8 @@ namespace SoundBank {
     static const char* SFX_WHISTLE = "sounds/whistle.mp3";
     
     // Music
-    static const char* BGM_GAME = "music/game_bgm.mp3";
-    static const char* BGM_MENU = "music/menu_bgm.mp3";
+    static const char* BGM_GAME = "music.ogg";
+    static const char* BGM_MENU = "music.ogg";
 }
 
 #endif // __SOUND_BANK_H__

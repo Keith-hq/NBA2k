@@ -101,7 +101,7 @@ void InputSystem::updateGameKeys() {
     _gameKeyState[GameKey::SHOOT] = _mouseLeftDown;
     _gameKeyState[GameKey::PASS] = _mouseRightDown;
     
-    _gameKeyState[GameKey::STEAL] = _keyState[EventKeyboard::KeyCode::KEY_F];
+    _gameKeyState[GameKey::STEAL] = _keyState[EventKeyboard::KeyCode::KEY_Q];
     _gameKeyState[GameKey::CROSSOVER] = _keyState[EventKeyboard::KeyCode::KEY_E];
     _gameKeyState[GameKey::DEFEND] = _keyState[EventKeyboard::KeyCode::KEY_V]; // Manual defend key
 }

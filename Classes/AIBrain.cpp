@@ -156,33 +156,8 @@ void AIBrain::processOffense(const InputData& input) {
     _output.sprint = true;
 
     float distToOpponent = getDistance2D(input.selfPos, input.opponentPos);
-    
-    // Check if we should shoot
-    // User Request: Shoot when distance to player is greater than a certain range.
-    // We define "Safe Range" as 1.5 meters (Reduced from 2.0f for more aggression).
-    float safeRange = 1.5f;
-    
-    // Condition: In range (< 7.5f), and Open (opponent > safeRange), facing hoop
-    // We relaxed the hoop distance slightly to allow mid-range/3pt shots if open.
-    bool canShoot = (distToHoop < 7.5f) && (distToOpponent > safeRange);
-    
-    // Hard AI is more aggressive / can shoot with less space
-    if (_difficulty == Difficulty::HARD) {
-        if (distToHoop < 8.0f && distToOpponent > 1.0f) canShoot = true;
-    } else if (_difficulty == Difficulty::EASY) {
-        // Easy AI needs more space
-         if (distToOpponent < 2.5f) canShoot = false;
-    }
-    
-    // If we are "Wide Open" (very far from defender), shoot even if further out
-    if (distToOpponent > 4.0f && distToHoop < 9.0f) {
-        canShoot = true;
-    }
-    
-    // Force shoot if very close to hoop (Layup/Dunk range)
-    if (distToHoop < 1.5f && distToOpponent > 0.5f) {
-        canShoot = true;
-    }
+    float shootDistance = 2.5f;
+    bool canShoot = distToOpponent > shootDistance;
 
     // Shot Clock Panic
     // If shot clock is running out (< 4 seconds), force action
@@ -197,6 +172,16 @@ void AIBrain::processOffense(const InputData& input) {
         CCLOG("AIBrain: Shot Clock Panic! Time: %.2f", input.shotClock);
     }
     
+    // User Constraint: No shooting if > 1m beyond 3pt line (7.24m)
+    // 3pt line is at 7.24m. 1m beyond is 8.24m.
+    float maxShootRange = 8.24f; 
+    if (distToHoop > maxShootRange) {
+        canShoot = false;
+        // Exception: If shot clock is critically low (< 1.0s), maybe forced to heave?
+        // But user said "AI not allowed to shoot", so we respect that strictly unless 0.0s
+        if (input.shotClock < 0.5f) canShoot = true; // Desperation heave
+    }
+
     if (canShoot) {
         // Start Shooting
         _isShooting = true;
@@ -206,95 +191,11 @@ void AIBrain::processOffense(const InputData& input) {
         _output.shoot = true; 
     } else {
         _output.shoot = false;
-        
-        // Move Logic
-        Vec2 moveDir = cocos2d::Vec2::ZERO;
-
-        // More aggressive driving:
-        // If not shooting, always try to move towards hoop unless completely blocked
-        // Reduced "Defended" threshold to allow driving into contact
-        
-        if (distToOpponent < 1.0f) { // Only divert if VERY close
-            // Opponent is close (Defended)
-            // Strategy: Crossover / Drive Away
-            
-            // Vector from Opponent to Self (Retreat direction)
-            Vec2 fromOpponent = getDirectionTo(input.opponentPos, input.selfPos);
-            
-            // We want to move towards hoop but away from opponent
-            // Calculate a "Drive Lane"
-            // Cross product to find perpendicular vector (Side step)
-            Vec2 sideStep(dirToHoop.y, -dirToHoop.x); // Right
-            
-            // Check which side is more open?
-            // Simple: Move away from opponent's projected side
-            
-            // If opponent is directly between us and hoop, we need to go around
-            // Mix: 40% Towards Hoop, 60% Away from Opponent/Side
-            
-            // Dynamic Side Step:
-            // Check cross product of (Self->Hoop) x (Self->Opponent)
-            // If result is Positive (Opponent is Right), we go Left.
-            // If result is Negative (Opponent is Left), we go Right.
-            
-            Vec2 toHoop = dirToHoop;
-            Vec2 toOpp = getDirectionTo(input.selfPos, input.opponentPos);
-            float cross = toHoop.x * toOpp.y - toHoop.y * toOpp.x;
-            
-            Vec2 sideDir;
-            // Improved Crossover Logic:
-            // Add randomness to side selection to simulate "shaking" the defender
-            // 20% chance to go against the logical grain (Crossover)
-            bool doCrossover = (CCRANDOM_0_1() < 0.2f);
-            
-            if ((cross > 0 && !doCrossover) || (cross <= 0 && doCrossover)) {
-                // Go Left (Rotate +90)
-                sideDir = Vec2(-toHoop.y, toHoop.x);
-            } else {
-                // Go Right (Rotate -90)
-                sideDir = Vec2(toHoop.y, -toHoop.x);
-            }
-
-            // Apply Crossover Action
-            // If we are changing direction or blocked, use Crossover
-            if (doCrossover || distToOpponent < 0.8f) {
-                _output.crossover = true;
-            }
-
-            // More aggressive drive: Bias towards side movement to shake off
-            // Was 0.5 forward, 0.8 side. 
-            // New: 0.6 forward, 0.8 side -> Keep pushing forward
-            moveDir = (dirToHoop.getNormalized() * 0.6f + sideDir.getNormalized() * 0.8f).getNormalized();
-            _output.sprint = true; // Sprint to blow by
-            
-            // Step Back Logic:
-            // If very close (< 1.0m) and facing hoop, maybe step back to create space?
-            if (distToOpponent < 0.8f && CCRANDOM_0_1() < 0.05f) { // 5% chance per frame when close
-                 moveDir = -dirToHoop; // Step back
-                 _output.sprint = true; // Fast step back
-            }
-            
-        } else {
-            // Open path to hoop?
-            // Just go straight
-            moveDir = dirToHoop;
-            _output.sprint = true; // Always sprint on offense to pressure
-            
-            // If very close to hoop, stop sprinting to stabilize for shot?
-            if (distToHoop < 2.0f) _output.sprint = false;
-        }
-
-        // Safety: Ensure we always move if not shooting
-        if (moveDir.length() < 0.1f) {
-            // If somehow zero, move to hoop
-             moveDir = dirToHoop;
-             if (moveDir.length() < 0.1f) {
-                 // Already at hoop? Move back to clear space?
-                 // Or just move random
-                 moveDir = Vec2(1, 0); 
-             }
-        }
+        Vec2 away = getDirectionTo(input.opponentPos, input.selfPos);
+        Vec2 moveDir = (away + dirToHoop).getNormalized();
         _output.moveDir = moveDir;
+        _output.sprint = true;
+        if (distToOpponent < 1.5f) _output.crossover = true;
     }
 }
 

@@ -5,6 +5,7 @@
 #include "GameFeedback.h"
 #include "SimplePhysics.h"
 #include "SaveSystem.h"
+#include "EffectsManager.h"
 
 USING_NS_CC;
 
@@ -68,6 +69,10 @@ void MatchManager::reset() {
     _isJumpBallActive = false;
     _jumpBallTimer = 0.0f;
     ScoreManager::getInstance()->reset();
+    
+    // Reset Players
+    if (_player) _player->reset();
+    if (_aiPlayer) _aiPlayer->reset();
 }
 
 void MatchManager::update(float dt) {
@@ -140,6 +145,7 @@ void MatchManager::handleGoal(bool isPlayerScored, int points) {
     // Determine position for feedback
     Vec3 hoopCenter(0, SimplePhysics::HOOP_HEIGHT, SimplePhysics::HOOP_Z);
     GameFeedback::getInstance()->showScore(points, hoopCenter);
+    EffectsManager::getInstance()->playGoalEffect(hoopCenter);
     
     if (isPlayerScored) {
         if (_player) _player->celebrate();
@@ -184,6 +190,10 @@ void MatchManager::handleViolation(bool isPlayerViolation, const std::string& vi
 void MatchManager::startCheckBall(bool isPlayerBall) {
     if (!_player || !_aiPlayer || !_ball) return;
     
+    // Ensure players are reset (State wise)
+    _player->reset();
+    _aiPlayer->reset();
+    
     // Reset Positions for 1v1 Check Ball
     // Attacker at top of key (0, 0, 6) or (0, 0, 5) ?
     // Defender inside?
@@ -202,8 +212,21 @@ void MatchManager::startCheckBall(bool isPlayerBall) {
         _aiPlayer->setPosition3D(Vec3(0, 0, 5.0f));
         _aiPlayer->setRotation3D(Vec3(0, 0, 0)); // Face attacker
         
-        // Give Ball
-        _ball->setPosition3D(Vec3(0, 1, checkZ));
+        // Give Ball - Place in front of player to avoid collision
+        Vec3 offset(0, 0, -0.5f); // Player facing 180 (towards +Z?), wait. 
+        // Player rotation (0, 180, 0) means facing towards +Z usually? Or -Z?
+        // Default camera looks at -Z.
+        // If player faces hoop (at -Z?), rotation is 180?
+        // Let's assume standard Cocos coordinate: -Z is forward.
+        // If Rotation is 180, Forward is +Z.
+        // Hoop is at SimplePhysics::HOOP_Z (usually -10 or something).
+        
+        // Let's just place ball at safe distance relative to world, close to player.
+        // If player is at (0, 0, checkZ), ball at (0, 1, checkZ - 0.5f) might be safe if facing -Z.
+        // If facing +Z, ball at (0, 1, checkZ + 0.5f).
+        
+        // Better: Set ball position to player position + small offset, but rely on updateBallPosition
+        _ball->setPosition3D(Vec3(0, 1, checkZ - 1.0f)); 
         _ball->setVelocity(Vec3::ZERO);
         _player->setBall(_ball);
         _player->setPossession(true);
@@ -217,7 +240,7 @@ void MatchManager::startCheckBall(bool isPlayerBall) {
         _player->setRotation3D(Vec3(0, 0, 0));
         
         // Give Ball
-        _ball->setPosition3D(Vec3(0, 1, checkZ));
+        _ball->setPosition3D(Vec3(0, 1, checkZ - 1.0f));
         _ball->setVelocity(Vec3::ZERO);
         _aiPlayer->setBall(_ball);
         _aiPlayer->setPossession(true);
@@ -231,6 +254,9 @@ void MatchManager::startCheckBall(bool isPlayerBall) {
 
 void MatchManager::triggerJumpBall() {
     if (!_player || !_aiPlayer || !_ball) return;
+    
+    _player->reset();
+    _aiPlayer->reset();
     
     _isJumpBallActive = true;
     _jumpBallTimer = 0.0f;

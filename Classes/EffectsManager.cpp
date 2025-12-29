@@ -61,9 +61,14 @@ void EffectsManager::playGoalEffect(const Vec3& position) {
     // Better: Use Pupil/Particle3D if available, but standard ParticleSystemQuad is easier.
     // Let's use 2D projection for simplicity as requested.
     
-    auto camera = _scene->getDefaultCamera();
+    Camera* camera = nullptr;
+    const auto& cams = _scene->getCameras();
+    for (auto* c : cams) {
+        if (c->getCameraFlag() == CameraFlag::USER1) { camera = c; break; }
+    }
+    if (!camera) camera = _scene->getDefaultCamera();
     if (camera) {
-        Vec2 screenPos = camera->project(position);
+        Vec2 screenPos = camera->projectGL(position);
         emitter->setPosition(screenPos);
         _scene->addChild(emitter, 1000); // Top Z
     }
@@ -86,9 +91,14 @@ void EffectsManager::playRimHitEffect(const Vec3& position) {
     emitter->setStartSize(5.0f);
     emitter->setAutoRemoveOnFinish(true);
     
-    auto camera = _scene->getDefaultCamera();
+    Camera* camera = nullptr;
+    const auto& cams = _scene->getCameras();
+    for (auto* c : cams) {
+        if (c->getCameraFlag() == CameraFlag::USER1) { camera = c; break; }
+    }
+    if (!camera) camera = _scene->getDefaultCamera();
     if (camera) {
-        Vec2 screenPos = camera->project(position);
+        Vec2 screenPos = camera->projectGL(position);
         emitter->setPosition(screenPos);
         _scene->addChild(emitter, 1000);
     }

@@ -29,12 +29,7 @@ public:
     void setRunSpeed(float speed);
     void setLookAt(const cocos2d::Vec3& target);
 
-private:
-    Player* _owner;
-    AnimState _currentState;
-    float _stateTime;
-    
-    // Internal helpers
+    // Helpers
     void playIdle();
     void playRun();
     void playDribble();
@@ -42,6 +37,11 @@ private:
     void playJump();
     void playDefend();
     void playCelebrate();
+
+private:
+    Player* _owner;
+    AnimState _currentState;
+    float _stateTime;
     
     void stopAllParts();
 };

@@ -65,31 +65,18 @@ void DefenseSystem::attemptSteal() {
     
     if (dist < STEAL_RANGE) {
         if (checkStealSuccess(opponent)) {
-            // User Request: Remove magnetic hands. 
-            // Steal should knock the ball loose, not teleport it.
-            
             Basketball* ball = opponent->getBall();
             if (ball) {
-                // 1. Remove from opponent
                 opponent->setPossession(false);
                 if (opponent->getDribbleSystem()) {
                     opponent->getDribbleSystem()->stopDribble();
                 }
-                
-                // 2. Knock ball loose (Physics Impulse)
-                // Calculate direction from Opponent to Owner (Stealer)
-                Vec3 dir = _owner->getPosition3D() - opponent->getPosition3D();
-                dir.normalize();
-                
-                // Add some upward force and randomness
-                Vec3 impulse = dir * 2.0f + Vec3(0, 3.0f, 0); // Pop up
-                
-                // Apply to ball
+                _owner->setPossession(true);
+                ball->setOwner(_owner);
+                ball->setState(Basketball::State::HELD);
                 if (ball->getBody()) {
-                     ball->getBody()->setVelocity(impulse);
+                    ball->getBody()->setVelocity(Vec3::ZERO);
                 }
-                ball->setState(Basketball::State::FLYING); // Or Loose
-                ball->setOwner(nullptr);
                 
                 // 3. Reset Shot Clock? Maybe not on loose ball until possession established
                 // ScoreManager::getInstance()->resetShotClock();
@@ -200,6 +187,13 @@ void DefenseSystem::attemptBlock() {
 }
 
 void DefenseSystem::onOpponentCrossover() {
+    Player* opponent = _owner->getOpponent();
+    if (!opponent) return;
+
+    // Distance Check: Only stun if close enough (e.g. < 2.5m)
+    float dist = _owner->getPosition3D().distance(opponent->getPosition3D());
+    if (dist > 2.5f) return;
+
     // Check if we get fooled (Ankle Breaker)
     // Base chance 40%
     float chance = 0.4f;
